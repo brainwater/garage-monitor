@@ -42,6 +42,16 @@ def publish_sensor(mqtt_client):
         "value_template": "{{ value_json.state }}"}
     mqtt_client.publish(CONFIG_TOPIC, json.dumps(payload))
 
+def initMqtt(mqtt_client):
+    try:
+        mqtt_client.connect()
+        publish_sensor(mqtt_client)
+        return True
+    except Exception as ex:
+        print("Failed to initialize mqtt, will retry")
+        print(ex)
+        return False
+    
 def run():
     prep()
     # Set up a MiniMQTT Client
@@ -53,23 +63,28 @@ def run():
         socket_pool=socket,
         ssl_context=ssl.create_default_context(),
     )
-    mqtt_client.connect()
-    publish_sensor(mqtt_client)
+    while not initMqtt(mqtt_client):
+        print("Retrying initialize mqtt_client")
     lastupdate = 0
     while True:
         if time.monotonic() > lastupdate + PUBLISH_DELAY:
             lastupdate = time.monotonic()
             if garageDoorIn.value:
                 state = "ON"
-                #print("ON")
             else:
                 state = "OFF"
-                #print("OFF")
             output = {
                 "state": state}
-            mqtt_client.publish(STATE_TOPIC, json.dumps(output))
-            #print("Published state")
+            try:
+                mqtt_client.publish(STATE_TOPIC, json.dumps(output))
+            except BrokenPipeError:
+                print("Broken pipe, will try to reinitialize mqtt")
+                try:
+                    mqtt_client.connect()
+                    print("Reconnected mqtt!")
+                except Exception as ex:
+                    print("Failed to reconnect mqtt!")
+                    print(ex)
         time.sleep(SLEEP_TIME)
 
-while True:
-    run()
+run()
