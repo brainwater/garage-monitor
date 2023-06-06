@@ -85,6 +85,14 @@ def run():
                 except Exception as ex:
                     print("Failed to reconnect mqtt!")
                     print(ex)
+            except ConnectionResetError:
+                print("Connection reset exception, will try to reinitialize mqtt")
+                try:
+                    mqtt_client.connect()
+                    print("Reconnected mqtt!")
+                except Exception as ex:
+                    print("Failed to reconnect mqtt!")
+                    print(ex)
         time.sleep(SLEEP_TIME)
 
 run()
