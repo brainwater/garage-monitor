@@ -17,7 +17,8 @@ except ImportError as ex:
     print("Secrets are kept in secrets.py, please add them there!")
     raise ex
 
-PUBLISH_DELAY = 10
+SENSOR_DELAY = 10
+DISCOVER_DELAY = 600 # How long between publishing the auto-discover information
 EXPIRE_DELAY = 20 # How long since a sensor update before the sensor is declared offline
 SLEEP_TIME = 1
 topic = "homeassistant/binary_sensor/garagedoor/"
@@ -66,33 +67,43 @@ def run():
     while not initMqtt(mqtt_client):
         print("Retrying initialize mqtt_client")
     lastupdate = 0
+    lastdiscover = 0
     while True:
-        if time.monotonic() > lastupdate + PUBLISH_DELAY:
-            lastupdate = time.monotonic()
-            if garageDoorIn.value:
-                state = "ON"
-            else:
-                state = "OFF"
-            output = {
-                "state": state}
-            try:
+        try:
+            # TODO: convert to async for code cleanup
+            # TODO: add proper logging
+            # TODO: add log forwarding to central server
+            if time.monotonic() > lastdiscover + DISCOVER_DELAY:
+                publish_sensor(mqtt_client)
+                lastdiscover = time.monotonic()
+            if time.monotonic() > lastupdate + SENSOR_DELAY:
+                if garageDoorIn.value:
+                    state = "ON"
+                else:
+                    state = "OFF"
+                output = {
+                    "state": state}
                 mqtt_client.publish(STATE_TOPIC, json.dumps(output))
-            except BrokenPipeError:
-                print("Broken pipe, will try to reinitialize mqtt")
-                try:
-                    mqtt_client.connect()
-                    print("Reconnected mqtt!")
-                except Exception as ex:
-                    print("Failed to reconnect mqtt!")
-                    print(ex)
-            except ConnectionResetError:
-                print("Connection reset exception, will try to reinitialize mqtt")
-                try:
-                    mqtt_client.connect()
-                    print("Reconnected mqtt!")
-                except Exception as ex:
-                    print("Failed to reconnect mqtt!")
-                    print(ex)
+                lastupdate = time.monotonic()
+        except OSError as ex:
+            print(ex)
+            print("OSError when trying to publish sensor data, likely a network disconnection!")
+        except BrokenPipeError:
+            print("Broken pipe, will try to reinitialize mqtt")
+            try:
+                mqtt_client.connect()
+                print("Reconnected mqtt!")
+            except Exception as ex:
+                print("Failed to reconnect mqtt!")
+                print(ex)
+        except ConnectionResetError:
+            print("Connection reset exception, will try to reinitialize mqtt")
+            try:
+                mqtt_client.connect()
+                print("Reconnected mqtt!")
+            except Exception as ex:
+                print("Failed to reconnect mqtt!")
+                print(ex)
         time.sleep(SLEEP_TIME)
 
 run()
