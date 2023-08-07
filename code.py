@@ -1,9 +1,6 @@
-
-
 import time
 import ssl
 import json
-#import alarm
 import board
 import digitalio
 #import socketpool
