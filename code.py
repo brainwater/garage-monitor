@@ -85,9 +85,6 @@ def run():
                     "state": state}
                 mqtt_client.publish(STATE_TOPIC, json.dumps(output))
                 lastupdate = time.monotonic()
-        except OSError as ex:
-            print(ex)
-            print("OSError when trying to publish sensor data, likely a network disconnection!")
         except BrokenPipeError:
             print("Broken pipe, will try to reinitialize mqtt")
             try:
@@ -98,6 +95,15 @@ def run():
                 print(ex)
         except ConnectionResetError:
             print("Connection reset exception, will try to reinitialize mqtt")
+            try:
+                mqtt_client.connect()
+                print("Reconnected mqtt!")
+            except Exception as ex:
+                print("Failed to reconnect mqtt!")
+                print(ex)
+        except OSError as ex:
+            print(ex)
+            print("OSError when trying to publish sensor data, likely a network disconnection!")
             try:
                 mqtt_client.connect()
                 print("Reconnected mqtt!")
